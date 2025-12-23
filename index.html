@@ -1,0 +1,1881 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数独パズル - Sudoku</title>
+    
+    <!-- PWA メタタグ -->
+    <meta name="description" content="オフラインで楽しめる数独パズルゲーム。簡単から限界モードまで多彩な難易度。">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="数独">
+    
+    <!-- マニフェスト -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- アイコン -->
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px 20px 150px 20px; 
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 95vw;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 2em;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .difficulty-btn {
+            background: #667eea;
+            color: white;
+            padding: 10px 15px;
+        }
+
+        .difficulty-btn:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        .difficulty-btn.active {
+            background: #764ba2;
+        }
+
+        .difficulty-btn[data-difficulty="extreme"] {
+            background: #ffd700;
+            color: #c53030;
+            font-weight: 900;
+            border: 2px solid #c53030;
+            animation: pulse 2s infinite;
+        }
+
+        .difficulty-btn[data-difficulty="extreme"]:hover {
+            background: #ffed4e;
+            color: #9b2c2c;
+            transform: translateY(-2px) scale(1.05);
+        }
+
+        .difficulty-btn[data-difficulty="extreme"].active {
+            background: #ffd700;
+            color: #c53030;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.6);
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+            }
+            50% {
+                box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+            }
+        }
+
+        .action-btn {
+            background: #48bb78;
+            color: white;
+        }
+
+        .action-btn:hover {
+            background: #38a169;
+            transform: translateY(-2px);
+        }
+
+        .check-btn {
+            background: #ed8936;
+            color: white;
+        }
+
+        .check-btn:hover {
+            background: #dd6b20;
+            transform: translateY(-2px);
+        }
+
+        .sudoku-grid {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            gap: 0;
+            border: 3px solid #333;
+            margin: 0 auto 20px;
+            width: fit-content;
+            background: #333;
+        }
+
+        .sudoku-cell {
+            width: 65px;
+            height: 65px;
+            border: 1px solid #999;
+            text-align: center;
+            font-size: 28px; 
+            font-weight: 900; 
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            outline: none;
+            position: relative;
+        }
+        
+        .sudoku-cell:not(.fixed) {
+            font-weight: 700;
+            color: #3182ce;
+        }
+        
+        .candidate-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            font-size: 13px; 
+            font-weight: bold; 
+            color: #333; 
+            padding: 2px;
+        }
+
+        .candidate-number {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            line-height: 1;
+            min-width: 100%; 
+        }
+
+        .sudoku-cell:focus {
+            outline: none;
+            background: #e6f3ff;
+        }
+
+        .sudoku-cell.fixed {
+            background: #f0f0f0;
+            color: #333;
+            cursor: default;
+        }
+
+        .sudoku-cell.error {
+            background: #fed7d7;
+            color: #c53030;
+        }
+
+        .sudoku-cell.correct {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+        
+        .sudoku-cell.highlight {
+            background: #ebf8ff !important;
+        }
+
+        .sudoku-cell.same-value {
+            background: #fff5e0 !important;
+        }
+
+        .sudoku-cell.selected {
+            background: #bee3f8 !important;
+        }
+
+        .sudoku-cell:nth-child(9n+3),
+        .sudoku-cell:nth-child(9n+6) {
+            border-right: 2px solid #333;
+        }
+
+        .sudoku-cell:nth-child(n+19):nth-child(-n+27),
+        .sudoku-cell:nth-child(n+46):nth-child(-n+54) {
+            border-bottom: 2px solid #333;
+        }
+
+        .info {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .keyboard-hint {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #999;
+            padding: 8px;
+            background: #f7fafc;
+            border-radius: 6px;
+        }
+
+        .difficulty-warning {
+            text-align: center;
+            margin: -10px 0 15px 0;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            min-height: 20px;
+        }
+
+        .difficulty-warning.show {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            color: #856404;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .timer {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .best-time {
+            text-align: center;
+            font-size: 16px; 
+            font-weight: bold;
+            color: #ed8936; 
+            margin-bottom: 10px;
+        }
+
+        .message {
+            text-align: center;
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: 600;
+            display: none;
+        }
+
+        .message.success {
+            background: #c6f6d5;
+            color: #22543d;
+            display: block;
+        }
+
+        .message.error {
+            background: #fed7d7;
+            color: #c53030;
+            display: block;
+        }
+
+        #keypad-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: #f7fafc;
+            box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.1);
+            padding: 10px 0;
+            z-index: 1000;
+        }
+        
+        .keypad-grid {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            gap: 8px;
+            width: 90%;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 0 10px;
+        }
+        
+        .keypad-btn {
+            width: 100%;
+            height: 50px;
+            font-size: 20px;
+            font-weight: bold;
+            background: #764ba2;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .keypad-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .keypad-btn.completed {
+            background: #a0aec0 !important;
+            cursor: default;
+            opacity: 0.7;
+        }
+
+        .keypad-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            width: 90%;
+            max-width: 600px;
+            margin: 10px auto 0;
+            padding: 0 10px;
+        }
+        
+        .keypad-actions button {
+            height: 50px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .keypad-mode-btn {
+            background: #4299e1;
+        }
+
+        .keypad-mode-btn.candidate-mode {
+            background: #ed8936;
+        }
+        
+        .keypad-clear {
+            background: #e53e3e;
+        }
+
+        .keypad-undo {
+            background: #38a169;
+        }
+
+        /* PWA Install Banner */
+        .install-banner {
+            position: fixed;
+            bottom: 170px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 15px 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            display: none;
+            align-items: center;
+            gap: 15px;
+            z-index: 1001;
+            max-width: 90%;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        .install-banner.show {
+            display: flex;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        .install-banner-text {
+            flex: 1;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .install-banner-btn {
+            background: #667eea;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .install-banner-btn:hover {
+            background: #5568d3;
+        }
+
+        .install-banner-close {
+            background: transparent;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #999;
+            padding: 0;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .install-banner-close:hover {
+            color: #333;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding-bottom: 150px;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 1.5em;
+            }
+
+            .difficulty-btn {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            button {
+                padding: 8px 15px;
+                font-size: 13px;
+            }
+            
+            .sudoku-cell {
+                width: 40px;
+                height: 40px;
+                font-size: 20px; 
+            }
+            
+            .candidate-container {
+                padding: 1px;
+                font-size: 11px; 
+            }
+            
+            #keypad-container {
+                padding: 5px 0;
+            }
+            
+            .keypad-grid {
+                width: 100%;
+                gap: 5px;
+            }
+            
+            .keypad-btn {
+                height: 40px;
+                font-size: 16px;
+            }
+            
+            .keypad-actions button {
+                height: 40px;
+                font-size: 14px;
+            }
+            
+            .keyboard-hint {
+                display: none;
+            }
+
+            .install-banner {
+                bottom: 155px;
+                font-size: 12px;
+            }
+        }
+
+        .print-container {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            z-index: 9999;
+        }
+
+        .print-container.active {
+            display: block;
+        }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            
+            .print-container,
+            .print-container * {
+                visibility: visible;
+            }
+            
+            .print-container {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+            }
+        }
+
+        .a4-page {
+            width: 210mm;
+            height: 297mm;
+            margin: 0 auto;
+            padding: 10mm;
+            box-sizing: border-box;
+            page-break-after: always;
+            page-break-inside: avoid;
+            position: relative;
+        }
+        
+        .a4-page:last-of-type {
+            page-break-after: auto;
+        }
+
+        .puzzle-grid-2x2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 5mm;
+            height: 100%;
+        }
+
+        .puzzle-item {
+            border: 2px solid #333;
+            padding: 3mm;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: white;
+        }
+
+        .puzzle-item h3 {
+            font-size: 14pt;
+            margin: 0 0 2mm 0;
+            color: #333;
+        }
+
+        .puzzle-item .puzzle-mini-grid {
+            display: grid;
+            grid-template-columns: repeat(9, 1fr);
+            gap: 0;
+            border: 2px solid #333;
+            background: #333;
+        }
+
+        .puzzle-item .mini-cell {
+            width: 8mm;
+            height: 8mm;
+            border: 0.5px solid #999;
+            text-align: center;
+            font-size: 10pt;
+            font-weight: bold;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .puzzle-item .mini-cell.fixed {
+            background: #f0f0f0;
+        }
+
+        .puzzle-item .mini-cell:nth-child(3n) {
+            border-right: 1.5px solid #333;
+        }
+
+        .puzzle-item .mini-cell:nth-child(n+19):nth-child(-n+27),
+        .puzzle-item .mini-cell:nth-child(n+46):nth-child(-n+54) {
+            border-bottom: 1.5px solid #333;
+        }
+
+        .puzzle-item .puzzle-info {
+            margin-top: 2mm;
+            font-size: 9pt;
+            color: #666;
+            text-align: center;
+        }
+
+        .print-buttons {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 10000;
+            display: flex;
+            gap: 10px;
+        }
+
+        @media print {
+            .print-buttons {
+                display: none;
+            }
+            
+            .a4-page {
+                margin: 0;
+                padding: 10mm;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- PWA Install Banner -->
+    <div class="install-banner" id="installBanner">
+        <div class="install-banner-text">
+            📱 アプリとしてインストールして、オフラインでもプレイできます！
+        </div>
+        <button class="install-banner-btn" id="installBtn">インストール</button>
+        <button class="install-banner-close" id="closeBannerBtn">×</button>
+    </div>
+
+    <div class="container">
+        <h1>🎯 数独パズル</h1>
+        
+        <div class="timer" id="timer">時間: 00:00</div>
+        <div class="best-time" id="bestTimeDisplay">最高タイム (限界モード): -</div>
+        
+        <div class="controls">
+            <button class="difficulty-btn active" data-difficulty="easy">簡単</button>
+            <button class="difficulty-btn" data-difficulty="medium">普通</button>
+            <button class="difficulty-btn" data-difficulty="hard">難しい</button>
+            <button class="difficulty-btn" data-difficulty="veryhard">超難</button>
+            <button class="difficulty-btn" data-difficulty="expert">エキスパート</button>
+            <button class="difficulty-btn" data-difficulty="extreme">ギリギリ限界！濱口さんモード</button>
+        </div>
+        
+        <div class="difficulty-warning" id="difficultyWarning"></div>
+        
+        <div class="controls">
+            <button class="action-btn" onclick="generatePuzzle()">新しいパズル</button>
+            <button class="check-btn" onclick="checkSolution()">答え合わせ</button>
+            <button class="action-btn" onclick="showSolution()">解答を表示</button>
+            <button class="action-btn" onclick="exportToJPG()">JPG出力</button>
+            <button class="action-btn" onclick="generate4Puzzles()">4問作成・印刷</button>
+        </div>
+        
+        <div class="sudoku-grid" id="sudokuGrid"></div>
+        
+        <div class="keyboard-hint">
+            💡 キーボード操作：1-9で数字入力 | 0/Delete/Backspaceで消去 | 矢印キーで移動
+        </div>
+        
+        <div class="message" id="message"></div>
+        
+        <div class="info">
+            1-9の数字を入力してください<br>
+            各行・列・3×3ブロックに1-9が一度ずつ入ります
+        </div>
+    </div>
+    
+    <div id="keypad-container">
+        <div class="keypad-grid" id="keypadGrid">
+        </div>
+        <div class="keypad-actions">
+            <button class="keypad-mode-btn" id="modeToggleBtn" onclick="toggleInputMode()">本入力</button>
+            <button class="keypad-btn keypad-clear" data-value="0">消去</button>
+            <button class="keypad-btn keypad-undo" onclick="undoLastMove()">Undo</button> 
+        </div>
+    </div>
+    
+    <script>
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then((registration) => {
+                        console.log('Service Worker registered successfully:', registration.scope);
+                    })
+                    .catch((error) => {
+                        console.log('Service Worker registration failed:', error);
+                    });
+            });
+        }
+
+        // PWA Install Prompt
+        let deferredPrompt;
+        const installBanner = document.getElementById('installBanner');
+        const installBtn = document.getElementById('installBtn');
+        const closeBannerBtn = document.getElementById('closeBannerBtn');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            // Prevent the mini-infobar from appearing on mobile
+            e.preventDefault();
+            // Stash the event so it can be triggered later
+            deferredPrompt = e;
+            // Show the install banner
+            const bannerDismissed = localStorage.getItem('installBannerDismissed');
+            if (!bannerDismissed) {
+                installBanner.classList.add('show');
+            }
+        });
+
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) {
+                return;
+            }
+            // Show the install prompt
+            deferredPrompt.prompt();
+            // Wait for the user to respond to the prompt
+            const { outcome } = await deferredPrompt.userChoice;
+            console.log(`User response to the install prompt: ${outcome}`);
+            // Clear the deferredPrompt
+            deferredPrompt = null;
+            // Hide the banner
+            installBanner.classList.remove('show');
+        });
+
+        closeBannerBtn.addEventListener('click', () => {
+            installBanner.classList.remove('show');
+            localStorage.setItem('installBannerDismissed', 'true');
+        });
+
+        window.addEventListener('appinstalled', () => {
+            console.log('PWA was installed');
+            installBanner.classList.remove('show');
+            deferredPrompt = null;
+        });
+
+        // Original Sudoku Game Code
+        let puzzle = [];
+        let solution = [];
+        let difficulty = 'easy';
+        let selectedCell = null;
+        let startTime = null;
+        let timerInterval = null;
+        
+        let inputMode = 'final';
+        let historyStack = [];
+        const MAX_HISTORY = 50;
+        const localStorageKey = 'sudokuAppState';
+        const bestTimeKey = 'sudokuBestTimeExtreme'; 
+
+        function formatTime(totalSeconds) {
+            const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+            const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+            return `${minutes}:${seconds}`;
+        }
+        
+        function displayBestTime() {
+            const displayElement = document.getElementById('bestTimeDisplay');
+            try {
+                const bestTimeSeconds = localStorage.getItem(bestTimeKey);
+                
+                if (bestTimeSeconds && parseInt(bestTimeSeconds) > 0) {
+                    const time = parseInt(bestTimeSeconds);
+                    displayElement.textContent = `最高タイム (限界モード): ${formatTime(time)}`;
+                } else {
+                    displayElement.textContent = '最高タイム (限界モード): -';
+                }
+            } catch (error) {
+                console.error('Error displaying best time:', error);
+                displayElement.textContent = '最高タイム (限界モード): -';
+            }
+        }
+
+        document.querySelectorAll('.difficulty-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                difficulty = this.dataset.difficulty;
+                updateDifficultyWarning();
+            });
+        });
+
+        function updateDifficultyWarning() {
+            const warning = document.getElementById('difficultyWarning');
+            
+            if (difficulty === 'extreme') {
+                warning.textContent = '🔥 濱口さんモード発動！極限の難易度に挑戦！17個のヒントのみ。';
+                warning.className = 'difficulty-warning show';
+            } else {
+                warning.textContent = '';
+                warning.className = 'difficulty-warning';
+            }
+        }
+        
+        function saveState() {
+            const cells = document.querySelectorAll('.sudoku-cell');
+            const currentStateBoard = Array.from(cells).map(cell => {
+                const finalValue = getCellFinalValue(cell);
+                return {
+                    final: finalValue,
+                    candidates: cell.dataset.candidates || '',
+                    fixed: cell.classList.contains('fixed')
+                };
+            });
+
+            if (historyStack.length > 0) {
+                const lastState = historyStack[historyStack.length - 1];
+                let isSame = true;
+                for (let i = 0; i < currentStateBoard.length; i++) {
+                    if (currentStateBoard[i].final !== lastState.boardState[i].final ||
+                        currentStateBoard[i].candidates !== lastState.boardState[i].candidates) {
+                        isSame = false;
+                        break;
+                    }
+                }
+                if (isSame) return;
+            }
+            
+            if (historyStack.length >= MAX_HISTORY) {
+                historyStack.shift();
+            }
+            
+            historyStack.push({
+                boardState: currentStateBoard,
+                time: document.getElementById('timer').textContent
+            });
+            saveToLocalStorage();
+        }
+
+        function undoLastMove() {
+            if (historyStack.length <= 1) {
+                showMessage('これ以上戻れません。', 'error');
+                return;
+            }
+            
+            historyStack.pop(); 
+            const previousState = historyStack[historyStack.length - 1];
+            
+            if (previousState) {
+                loadStateFromHistory(previousState.boardState);
+                updateTimerDisplay(previousState.time);
+                updateCompletedNumbersGrayOut();
+                showMessage('一手戻しました。', 'success');
+                setTimeout(clearMessage, 1500);
+            }
+            saveToLocalStorage();
+        }
+        
+        function loadStateFromHistory(boardState) {
+            const cells = document.querySelectorAll('.sudoku-cell');
+            cells.forEach((cell, index) => {
+                const state = boardState[index];
+                
+                if (state.fixed) {
+                    cell.classList.add('fixed');
+                } else {
+                    cell.classList.remove('fixed');
+                }
+                
+                cell.dataset.candidates = state.candidates || '';
+                setCellFinalValue(cell, state.final);
+                
+                cell.classList.remove('error', 'correct');
+                
+                renderCandidates(cell);
+            });
+        }
+        
+        function updateTimerDisplay(time) {
+            document.getElementById('timer').textContent = time || '時間: 00:00';
+        }
+
+        function saveToLocalStorage() {
+            try {
+                const cells = document.querySelectorAll('.sudoku-cell');
+                const appState = {
+                    puzzle: puzzle,
+                    solution: solution,
+                    difficulty: difficulty,
+                    currentBoardState: Array.from(cells).map(cell => {
+                        const finalValue = getCellFinalValue(cell);
+                        return {
+                            final: finalValue,
+                            candidates: cell.dataset.candidates || '',
+                            fixed: cell.classList.contains('fixed')
+                        };
+                    }),
+                    time: document.getElementById('timer').textContent,
+                    elapsedSeconds: timerInterval ? Math.floor((Date.now() - startTime) / 1000) : 0
+                };
+                localStorage.setItem(localStorageKey, JSON.stringify(appState));
+            } catch (error) {
+                console.error('Error saving to localStorage:', error);
+            }
+        }
+
+        function loadFromLocalStorage() {
+            try {
+                const savedState = localStorage.getItem(localStorageKey);
+                if (!savedState) return false;
+
+                const appState = JSON.parse(savedState);
+                
+                puzzle = appState.puzzle;
+                solution = appState.solution;
+                difficulty = appState.difficulty || 'easy';
+                
+                document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
+                const activeBtn = document.querySelector(`.difficulty-btn[data-difficulty="${difficulty}"]`);
+                if (activeBtn) activeBtn.classList.add('active');
+
+                displayPuzzle(appState.currentBoardState);
+
+                clearTimer();
+                if (appState.elapsedSeconds > 0) {
+                    startTime = Date.now() - (appState.elapsedSeconds * 1000);
+                    timerInterval = setInterval(updateTimer, 1000);
+                } else {
+                    document.getElementById('timer').textContent = appState.time || '時間: 00:00';
+                }
+                
+                historyStack = []; 
+                historyStack.push({
+                    boardState: appState.currentBoardState,
+                    time: appState.time
+                });
+
+                updateDifficultyWarning();
+                updateCompletedNumbersGrayOut();
+                showMessage('前回の続きをロードしました。', 'success');
+                setTimeout(clearMessage, 3000);
+                
+                return true;
+            } catch (error) {
+                console.error('Error loading from localStorage:', error);
+                return false;
+            }
+        }
+        
+        function toggleInputMode() {
+            const btn = document.getElementById('modeToggleBtn');
+            if (inputMode === 'final') {
+                inputMode = 'candidate';
+                btn.textContent = '候補入力';
+                btn.classList.add('candidate-mode');
+                showMessage('✏️ 候補入力モード (ペンシルマーク)', 'success');
+            } else {
+                inputMode = 'final';
+                btn.textContent = '本入力';
+                btn.classList.remove('candidate-mode');
+                showMessage('✅ 本入力モード (確定数字)', 'success');
+            }
+            setTimeout(clearMessage, 1500);
+        }
+
+        function initGrid() {
+            const grid = document.getElementById('sudokuGrid');
+            const keypadGrid = document.getElementById('keypadGrid');
+            grid.innerHTML = '';
+            
+            keypadGrid.innerHTML = '';
+            for (let num = 1; num <= 9; num++) {
+                const btn = document.createElement('button');
+                btn.className = 'keypad-btn';
+                btn.textContent = num;
+                btn.dataset.value = num;
+                btn.addEventListener('click', () => handleKeypadInput(num));
+                keypadGrid.appendChild(btn);
+            }
+            
+            document.querySelector('.keypad-clear').addEventListener('click', () => handleKeypadInput(0));
+            
+            for (let i = 0; i < 81; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'sudoku-cell';
+                cell.dataset.index = i;
+                cell.tabIndex = 0;
+                
+                cell.addEventListener('click', function() {
+                    this.focus(); 
+                });
+
+                cell.addEventListener('focus', function() {
+                    clearHighlighting();
+                    if (selectedCell) {
+                        selectedCell.classList.remove('selected');
+                    }
+                    selectedCell = this;
+                    this.classList.add('selected');
+                    updateHighlighting(this);
+                    clearMessage();
+                });
+
+                cell.addEventListener('blur', function() {
+                    clearHighlighting();
+                    this.classList.remove('selected');
+                });
+                
+                cell.addEventListener('keydown', function(e) {
+                    if (e.key >= '1' && e.key <= '9') {
+                        if (!this.classList.contains('fixed')) {
+                            e.preventDefault();
+                            handleKeypadInput(parseInt(e.key));
+                        }
+                    }
+                    else if (e.key === '0' || e.key === 'Delete' || e.key === 'Backspace') {
+                        if (!this.classList.contains('fixed')) {
+                            e.preventDefault();
+                            handleKeypadInput(0);
+                        }
+                    }
+                    else {
+                        handleKeyNavigation(e, i);
+                    }
+                });
+                
+                grid.appendChild(cell);
+            }
+            
+            if (!loadFromLocalStorage()) {
+                generatePuzzle();
+            }
+            
+            displayBestTime();
+        }
+
+        function handleKeyNavigation(e, index) {
+            let newIndex = index;
+            
+            switch(e.key) {
+                case 'ArrowUp':
+                    newIndex = index - 9;
+                    e.preventDefault();
+                    break;
+                case 'ArrowDown':
+                    newIndex = index + 9;
+                    e.preventDefault();
+                    break;
+                case 'ArrowLeft':
+                    newIndex = index - 1;
+                    e.preventDefault();
+                    break;
+                case 'ArrowRight':
+                    newIndex = index + 1;
+                    e.preventDefault();
+                    break;
+            }
+            
+            if (newIndex >= 0 && newIndex < 81) {
+                const cells = document.querySelectorAll('.sudoku-cell');
+                cells[newIndex].focus();
+            }
+        }
+
+        function handleKeypadInput(num) {
+            if (!selectedCell) {
+                showMessage('💡 入力するマスを選択してください', 'error');
+                setTimeout(clearMessage, 1500);
+                return;
+            }
+            if (selectedCell.classList.contains('fixed')) {
+                showMessage('💡 このマスは固定（ヒント）です', 'error');
+                setTimeout(clearMessage, 1500);
+                return;
+            }
+            
+            selectedCell.focus(); 
+
+            saveState(); 
+            
+            const row = Math.floor(parseInt(selectedCell.dataset.index) / 9);
+            const col = parseInt(selectedCell.dataset.index) % 9;
+            
+            let currentCandidates = (selectedCell.dataset.candidates || '')
+                .split(',')
+                .filter(c => c !== '')
+                .map(Number);
+            
+            if (inputMode === 'final') {
+                if (num === 0) {
+                    setCellFinalValue(selectedCell, 0);
+                    selectedCell.dataset.candidates = '';
+                } else {
+                    setCellFinalValue(selectedCell, num);
+                    selectedCell.dataset.candidates = '';
+                    updateCandidatesAutoRemoval(row, col, num); 
+                }
+            } 
+            else {
+                setCellFinalValue(selectedCell, 0);
+                
+                if (num === 0) {
+                    currentCandidates = [];
+                } else {
+                    const index = currentCandidates.indexOf(num);
+                    if (index > -1) {
+                        currentCandidates.splice(index, 1);
+                    } else {
+                        currentCandidates.push(num);
+                        currentCandidates.sort((a, b) => a - b);
+                    }
+                }
+                
+                selectedCell.dataset.candidates = currentCandidates.join(',');
+            }
+            
+            renderCandidates(selectedCell);
+            updateHighlighting(selectedCell);
+            clearMessage();
+            updateCompletedNumbersGrayOut();
+            saveToLocalStorage();
+        }
+        
+        function getCellFinalValue(cell) {
+            if (cell.querySelector('.candidate-container')) {
+                return 0;
+            }
+            const value = parseInt(cell.dataset.finalValue) || 0;
+            return value;
+        }
+        
+        function setCellFinalValue(cell, value) {
+            if (value === 0) {
+                cell.dataset.finalValue = '';
+            } else {
+                cell.dataset.finalValue = value.toString();
+            }
+        }
+        
+        function renderCandidates(cell) {
+            const finalValue = getCellFinalValue(cell);
+            
+            cell.innerHTML = '';
+            
+            const candidatesStr = cell.dataset.candidates;
+            const candidates = (candidatesStr || '')
+                .split(',')
+                .filter(c => c !== '')
+                .map(Number);
+            
+            if (candidates.length > 0) {
+                const container = document.createElement('div');
+                container.className = 'candidate-container';
+                
+                for (let i = 1; i <= 9; i++) {
+                    const numDiv = document.createElement('div');
+                    numDiv.className = 'candidate-number';
+                    if (candidates.includes(i)) {
+                        numDiv.textContent = i;
+                    } else {
+                        numDiv.textContent = '';
+                    }
+                    container.appendChild(numDiv);
+                }
+                
+                cell.appendChild(container);
+            } 
+            else if (finalValue > 0) {
+                cell.textContent = finalValue;
+            }
+        }
+        
+        function updateCandidatesAutoRemoval(targetRow, targetCol, value) {
+            if (value === 0) return;
+
+            const cells = document.querySelectorAll('.sudoku-cell');
+
+            cells.forEach((cell, index) => {
+                if (cell === selectedCell) return;
+                
+                const row = Math.floor(index / 9);
+                const col = index % 9;
+                
+                const blockRow = Math.floor(row / 3);
+                const blockCol = Math.floor(col / 3);
+                const targetBlockRow = Math.floor(targetRow / 3);
+                const targetBlockCol = Math.floor(targetCol / 3);
+                
+                const inScope = (row === targetRow || col === targetCol || 
+                                (blockRow === targetBlockRow && blockCol === targetBlockCol));
+                
+                let candidates = (cell.dataset.candidates || '')
+                    .split(',')
+                    .filter(c => c !== '')
+                    .map(Number);
+                
+                if (inScope && !cell.classList.contains('fixed') && candidates.length > 0) {
+                    const indexToRemove = candidates.indexOf(value);
+                    
+                    if (indexToRemove > -1) {
+                        candidates.splice(indexToRemove, 1);
+                        cell.dataset.candidates = candidates.join(',');
+                        renderCandidates(cell);
+                    }
+                }
+            });
+        }
+        
+        function updateCompletedNumbersGrayOut() {
+            const cells = document.querySelectorAll('.sudoku-cell');
+            const keypadButtons = document.querySelectorAll('.keypad-grid .keypad-btn');
+            
+            const count = {};
+            cells.forEach(cell => {
+                const value = getCellFinalValue(cell);
+                if (value >= 1 && value <= 9) {
+                    count[value] = (count[value] || 0) + 1;
+                }
+            });
+            
+            keypadButtons.forEach(btn => {
+                const num = parseInt(btn.dataset.value);
+                if (count[num] === 9) {
+                    btn.classList.add('completed');
+                } else {
+                    btn.classList.remove('completed');
+                }
+            });
+        }
+
+        function clearHighlighting() {
+            const cells = document.querySelectorAll('.sudoku-cell');
+            cells.forEach(cell => {
+                cell.classList.remove('highlight', 'same-value');
+            });
+        }
+        
+        function updateHighlighting(targetCell) {
+            clearHighlighting();
+
+            const cells = document.querySelectorAll('.sudoku-cell');
+            const targetIndex = parseInt(targetCell.dataset.index);
+            const targetRow = Math.floor(targetIndex / 9);
+            const targetCol = targetIndex % 9;
+            const targetBlockRow = Math.floor(targetRow / 3);
+            const targetBlockCol = Math.floor(targetCol / 3);
+            
+            const targetValue = getCellFinalValue(targetCell);
+
+            cells.forEach((cell, index) => {
+                const row = Math.floor(index / 9);
+                const col = index % 9;
+                const blockRow = Math.floor(row / 3);
+                const blockCol = Math.floor(col / 3);
+
+                if (row === targetRow || col === targetCol || 
+                    (blockRow === targetBlockRow && blockCol === targetBlockCol)) {
+                    
+                    if (cell !== targetCell) {
+                        cell.classList.add('highlight');
+                    }
+                }
+                
+                const cellValue = getCellFinalValue(cell);
+                if (targetValue > 0 && cellValue === targetValue) {
+                    cell.classList.add('same-value');
+                }
+
+                if (cell === targetCell) {
+                    cell.classList.add('selected');
+                }
+            });
+        }
+
+        function solveSudoku(board) {
+            const emptyCell = findEmptyCell(board);
+            if (!emptyCell) return true;
+            
+            const [row, col] = emptyCell;
+            const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9].sort(() => Math.random() - 0.5);
+            
+            for (let num of numbers) {
+                if (isValid(board, row, col, num)) {
+                    board[row][col] = num;
+                    
+                    if (solveSudoku(board)) {
+                        return true;
+                    }
+                    
+                    board[row][col] = 0;
+                }
+            }
+            
+            return false;
+        }
+
+        function findEmptyCell(board) {
+            for (let row = 0; row < 9; row++) {
+                for (let col = 0; col < 9; col++) {
+                    if (board[row][col] === 0) {
+                        return [row, col];
+                    }
+                }
+            }
+            return null;
+        }
+
+        function isValid(board, row, col, num) {
+            for (let x = 0; x < 9; x++) {
+                if (board[row][x] === num) return false;
+            }
+            
+            for (let x = 0; x < 9; x++) {
+                if (board[x][col] === num) return false;
+            }
+            
+            const startRow = Math.floor(row / 3) * 3;
+            const startCol = Math.floor(col / 3) * 3;
+            
+            for (let i = 0; i < 3; i++) {
+                for (let j = 0; j < 3; j++) {
+                    if (board[startRow + i][startCol + j] === num) {
+                        return false;
+                    }
+                }
+            }
+            
+            return true;
+        }
+
+        function generateSolution() {
+            const board = Array(9).fill().map(() => Array(9).fill(0));
+            solveSudoku(board);
+            return board;
+        }
+        
+        function generatePuzzle() {
+            clearTimer();
+            startTimer();
+            clearMessage();
+            
+            solution = generateSolution();
+            puzzle = solution.map(row => [...row]);
+            
+            const cellsToRemove = {
+                'easy': 40,      
+                'medium': 50,    
+                'hard': 55,      
+                'veryhard': 60,  
+                'expert': 64,    
+                'extreme': 64    
+            }[difficulty];
+            
+            let removed = 0;
+            while (removed < cellsToRemove) {
+                const row = Math.floor(Math.random() * 9);
+                const col = Math.floor(Math.random() * 9);
+                
+                if (puzzle[row][col] !== 0) {
+                    puzzle[row][col] = 0;
+                    removed++;
+                }
+            }
+            
+            displayPuzzle();
+            
+            historyStack = [];
+            saveState();
+            updateCompletedNumbersGrayOut();
+        }
+
+        function displayPuzzle(boardState = null) {
+            const cells = document.querySelectorAll('.sudoku-cell');
+            
+            cells.forEach((cell, index) => {
+                const row = Math.floor(index / 9);
+                const col = index % 9;
+                
+                cell.classList.remove('fixed', 'error', 'correct', 'selected');
+                cell.dataset.candidates = '';
+                setCellFinalValue(cell, 0);
+                
+                if (boardState) {
+                    const state = boardState[index];
+                    if (state.fixed) {
+                        setCellFinalValue(cell, state.final);
+                        cell.classList.add('fixed');
+                    } else {
+                        setCellFinalValue(cell, state.final);
+                        cell.dataset.candidates = state.candidates || '';
+                        cell.classList.remove('fixed');
+                    }
+                } else {
+                    const value = puzzle[row][col];
+                    if (value !== 0) {
+                        setCellFinalValue(cell, value);
+                        cell.classList.add('fixed');
+                    }
+                }
+                
+                renderCandidates(cell);
+            });
+        }
+
+        function checkSolution() {
+            const cells = document.querySelectorAll('.sudoku-cell');
+            let allCorrect = true;
+            let hasEmpty = false;
+            
+            cells.forEach((cell, index) => {
+                const row = Math.floor(index / 9);
+                const col = index % 9;
+                
+                cell.classList.remove('error', 'correct');
+                
+                if (!cell.classList.contains('fixed')) {
+                    const userValue = getCellFinalValue(cell);
+
+                    if (userValue === 0) {
+                        hasEmpty = true;
+                    } else {
+                        const correctValue = solution[row][col];
+                        
+                        if (userValue === correctValue) {
+                            cell.classList.add('correct');
+                        } else {
+                            cell.classList.add('error');
+                            allCorrect = false;
+                        }
+                    }
+                }
+            });
+            
+            if (hasEmpty) {
+                showMessage('まだ空白のマスがあります', 'error');
+            } else if (allCorrect) {
+                let customMessage = '🎉 おめでとうございます！正解です！';
+                
+                if (difficulty === 'extreme' && startTime) {
+                    try {
+                        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                        const savedBestTime = parseInt(localStorage.getItem(bestTimeKey)) || Infinity;
+                        
+                        if (elapsed < savedBestTime) {
+                            localStorage.setItem(bestTimeKey, elapsed);
+                            displayBestTime(); 
+                            customMessage = `🏆 新記録達成！最高タイム: ${formatTime(elapsed)} 🏆`;
+                        } else {
+                            customMessage = `✅ クリア！タイム: ${formatTime(elapsed)} (最高タイム: ${formatTime(savedBestTime)})`;
+                        }
+                    } catch (error) {
+                        console.error('Error saving best time:', error);
+                    }
+                }
+
+                clearTimer();
+                showMessage(customMessage, 'success');
+            } else {
+                showMessage('❌ 間違っている箇所があります', 'error');
+            }
+        }
+
+        function showSolution() {
+            if (confirm('解答を表示しますか？')) {
+                clearTimer();
+                const cells = document.querySelectorAll('.sudoku-cell');
+                
+                cells.forEach((cell, index) => {
+                    const row = Math.floor(index / 9);
+                    const col = index % 9;
+                    
+                    setCellFinalValue(cell, solution[row][col]);
+                    cell.dataset.candidates = '';
+                    renderCandidates(cell);
+                    cell.classList.remove('error');
+                    cell.classList.add('correct');
+                });
+                
+                showMessage('解答を表示しました', 'success');
+            }
+        }
+
+        function showMessage(text, type) {
+            const message = document.getElementById('message');
+            message.textContent = text;
+            message.className = 'message ' + type;
+        }
+
+        function clearMessage() {
+            const message = document.getElementById('message');
+            message.className = 'message';
+        }
+
+        function startTimer() {
+            startTime = Date.now();
+            
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function updateTimer() {
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            document.getElementById('timer').textContent = `時間: ${formatTime(elapsed)}`;
+        }
+
+        function clearTimer() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            document.getElementById('timer').textContent = '時間: 00:00';
+        }
+
+        async function generate4Puzzles() {
+            showMessage('4つのパズルを生成中...', 'success');
+            
+            const puzzles = [];
+            
+            for (let i = 0; i < 4; i++) {
+                const sol = generateSolution();
+                const puz = sol.map(row => [...row]);
+                
+                const cellsToRemove = {
+                    'easy': 40,
+                    'medium': 50,
+                    'hard': 55,
+                    'veryhard': 60,
+                    'expert': 64,
+                    'extreme': 64
+                }[difficulty];
+                
+                let removed = 0;
+                while (removed < cellsToRemove) {
+                    const row = Math.floor(Math.random() * 9);
+                    const col = Math.floor(Math.random() * 9);
+                    
+                    if (puz[row][col] !== 0) {
+                        puz[row][col] = 0;
+                        removed++;
+                    }
+                }
+                
+                puzzles.push({ puzzle: puz, solution: sol });
+            }
+            
+            createPrintLayout(puzzles);
+        }
+        
+        function createPrintLayout(puzzles) {
+            const existingContainer = document.getElementById('printContainer');
+            if (existingContainer) {
+                existingContainer.remove();
+            }
+            
+            const printContainer = document.createElement('div');
+            printContainer.id = 'printContainer';
+            printContainer.className = 'print-container active';
+            
+            const difficultyNames = {
+                'easy': '簡単',
+                'medium': '普通',
+                'hard': '難しい',
+                'veryhard': '超難',
+                'expert': 'エキスパート',
+                'extreme': 'ギリギリ限界！濱口さんモード'
+            };
+            
+            const problemPage = document.createElement('div');
+            problemPage.className = 'a4-page';
+            
+            const pageTitle = document.createElement('h2');
+            pageTitle.style.textAlign = 'center';
+            pageTitle.style.marginBottom = '5mm';
+            pageTitle.textContent = `数独パズル - ${difficultyNames[difficulty]}`;
+            problemPage.appendChild(pageTitle);
+            
+            const gridContainer = document.createElement('div');
+            gridContainer.className = 'puzzle-grid-2x2';
+            
+            puzzles.forEach((data, index) => {
+                const puzzleItem = document.createElement('div');
+                puzzleItem.className = 'puzzle-item';
+                
+                const puzzleTitle = document.createElement('h3');
+                puzzleTitle.textContent = `問題 ${index + 1}`;
+                puzzleItem.appendChild(puzzleTitle);
+                
+                const miniGrid = document.createElement('div');
+                miniGrid.className = 'puzzle-mini-grid';
+                
+                for (let i = 0; i < 9; i++) {
+                    for (let j = 0; j < 9; j++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'mini-cell';
+                        const value = data.puzzle[i][j];
+                        if (value !== 0) {
+                            cell.textContent = value;
+                            cell.classList.add('fixed');
+                        }
+                        miniGrid.appendChild(cell);
+                    }
+                }
+                
+                puzzleItem.appendChild(miniGrid);
+                
+                const info = document.createElement('div');
+                info.className = 'puzzle-info';
+                info.textContent = '各行・列・3×3ブロックに1-9が一度ずつ';
+                puzzleItem.appendChild(info);
+                
+                gridContainer.appendChild(puzzleItem);
+            });
+            
+            problemPage.appendChild(gridContainer);
+            problemPage.style.marginBottom = '20px';
+            
+            printContainer.appendChild(problemPage);
+            
+            const answerPage = document.createElement('div');
+            answerPage.className = 'a4-page';
+            
+            const answerTitle = document.createElement('h2');
+            answerTitle.style.textAlign = 'center';
+            answerTitle.style.marginBottom = '5mm';
+            answerTitle.textContent = `数独パズル - 解答`;
+            answerPage.appendChild(answerTitle);
+            
+            const answerGridContainer = document.createElement('div');
+            answerGridContainer.className = 'puzzle-grid-2x2';
+            
+            puzzles.forEach((data, index) => {
+                const puzzleItem = document.createElement('div');
+                puzzleItem.className = 'puzzle-item';
+                
+                const puzzleTitle = document.createElement('h3');
+                puzzleTitle.textContent = `解答 ${index + 1}`;
+                puzzleItem.appendChild(puzzleTitle);
+                
+                const miniGrid = document.createElement('div');
+                miniGrid.className = 'puzzle-mini-grid';
+                
+                for (let i = 0; i < 9; i++) {
+                    for (let j = 0; j < 9; j++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'mini-cell';
+                        const originalValue = data.puzzle[i][j];
+                        const solutionValue = data.solution[i][j];
+                        cell.textContent = solutionValue;
+                        if (originalValue !== 0) {
+                            cell.classList.add('fixed');
+                        }
+                        miniGrid.appendChild(cell);
+                    }
+                }
+                
+                puzzleItem.appendChild(miniGrid);
+                answerGridContainer.appendChild(puzzleItem);
+            });
+            
+            answerPage.appendChild(answerGridContainer);
+            printContainer.appendChild(answerPage);
+            
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'print-buttons';
+            
+            const printBtn = document.createElement('button');
+            printBtn.textContent = '印刷';
+            printBtn.className = 'action-btn';
+            printBtn.onclick = () => window.print();
+            
+            const downloadBtn = document.createElement('button');
+            downloadBtn.textContent = 'JPG保存';
+            downloadBtn.className = 'action-btn';
+            downloadBtn.onclick = () => exportA4ToJPG();
+            
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '閉じる';
+            closeBtn.className = 'check-btn';
+            closeBtn.onclick = () => {
+                printContainer.classList.remove('active');
+                setTimeout(() => printContainer.remove(), 300);
+            };
+            
+            buttonContainer.appendChild(printBtn);
+            buttonContainer.appendChild(downloadBtn);
+            buttonContainer.appendChild(closeBtn);
+            printContainer.appendChild(buttonContainer);
+            
+            document.body.appendChild(printContainer);
+            
+            clearMessage();
+            showMessage('✅ 4問のパズルを生成しました', 'success');
+            setTimeout(clearMessage, 3000);
+        }
+        
+        async function exportA4ToJPG() {
+            if (typeof html2canvas === 'undefined') {
+                await loadHtml2Canvas();
+            }
+            
+            const pages = document.querySelectorAll('.a4-page');
+            const buttons = document.querySelector('.print-buttons');
+            buttons.style.display = 'none';
+            
+            for (let i = 0; i < pages.length; i++) {
+                try {
+                    const canvas = await html2canvas(pages[i], {
+                        backgroundColor: '#ffffff',
+                        scale: 2,
+                        logging: false,
+                        useCORS: true,
+                        width: 794, 
+                        height: 1123 
+                    });
+                    
+                    await new Promise((resolve) => {
+                        canvas.toBlob(function(blob) {
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                            const pageName = i === 0 ? 'problems' : 'answers';
+                            link.download = `sudoku_4puzzles_${pageName}_${timestamp}.jpg`;
+                            link.href = url;
+                            link.click();
+                            URL.revokeObjectURL(url);
+                            resolve();
+                        }, 'image/jpeg', 0.95);
+                    });
+                    
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                } catch (error) {
+                    console.error('Export error:', error);
+                }
+            }
+            
+            buttons.style.display = 'flex';
+            alert('2枚の画像を保存しました（問題ページと解答ページ）');
+        }
+
+        async function exportToJPG() {
+            if (typeof html2canvas === 'undefined') {
+                await loadHtml2Canvas();
+            }
+            
+            showMessage('画像を生成中...', 'success');
+            
+            const container = document.querySelector('.container');
+            const controls = document.querySelectorAll('.controls');
+            const message = document.getElementById('message');
+            const info = document.querySelector('.info');
+            const keypad = document.getElementById('keypad-container');
+            const timer = document.getElementById('timer');
+            const bestTime = document.getElementById('bestTimeDisplay');
+            const installBanner = document.getElementById('installBanner');
+            
+            controls.forEach(c => c.style.display = 'none');
+            message.style.display = 'none';
+            info.style.display = 'none';
+            keypad.style.display = 'none';
+            timer.style.display = 'none'; 
+            bestTime.style.display = 'none'; 
+            installBanner.style.display = 'none';
+            
+            const cells = document.querySelectorAll('.sudoku-cell');
+            cells.forEach(cell => {
+                cell.classList.remove('selected', 'error', 'correct');
+                cell.blur();
+            });
+            
+            const difficultyText = document.createElement('div');
+            difficultyText.style.textAlign = 'center';
+            difficultyText.style.marginTop = '15px';
+            difficultyText.style.fontSize = '16px';
+            difficultyText.style.fontWeight = 'bold';
+            difficultyText.style.color = '#667eea';
+            const difficultyNames = {
+                'easy': '簡単',
+                'medium': '普通',
+                'hard': '難しい',
+                'veryhard': '超難',
+                'expert': 'エキスパート',
+                'extreme': 'ギリギリ限界！濱口さんモード'
+            };
+            difficultyText.textContent = `難易度: ${difficultyNames[difficulty]}`;
+            container.appendChild(difficultyText);
+            
+            setTimeout(async () => {
+                try {
+                    const canvas = await html2canvas(container, {
+                        backgroundColor: '#ffffff',
+                        scale: 2,
+                        logging: false,
+                        useCORS: true
+                    });
+                    
+                    canvas.toBlob(function(blob) {
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+                        link.download = `sudoku_${difficulty}_${timestamp}.jpg`;
+                        link.href = url;
+                        link.click();
+                        URL.revokeObjectURL(url);
+                        
+                        controls.forEach(c => c.style.display = 'flex');
+                        info.style.display = 'block';
+                        keypad.style.display = 'block';
+                        timer.style.display = 'block';
+                        bestTime.style.display = 'block';
+                        difficultyText.remove();
+                        
+                        showMessage('✅ 画像を保存しました', 'success');
+                        setTimeout(clearMessage, 3000);
+                    }, 'image/jpeg', 0.95);
+                    
+                } catch (error) {
+                    console.error('Export error:', error);
+                    controls.forEach(c => c.style.display = 'flex');
+                    info.style.display = 'block';
+                    keypad.style.display = 'block';
+                    timer.style.display = 'block';
+                    bestTime.style.display = 'block';
+                    difficultyText.remove();
+                    showMessage('❌ 画像の生成に失敗しました', 'error');
+                }
+            }, 100);
+        }
+        
+        function loadHtml2Canvas() {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        initGrid();
+    </script>
+</body>
+</html>
