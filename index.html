@@ -728,14 +728,24 @@
         // PWA Service Worker Registration
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('service-worker.js')
+                navigator.serviceWorker.register('./service-worker.js')
                     .then((registration) => {
                         console.log('Service Worker registered successfully:', registration.scope);
+                        
+                        // 更新チェック
+                        registration.addEventListener('updatefound', () => {
+                            console.log('Service Worker update found');
+                        });
                     })
                     .catch((error) => {
-                        console.log('Service Worker registration failed:', error);
+                        console.error('Service Worker registration failed:', error);
+                        // エラーでもアプリは動作する
+                        showMessage('オフライン機能が利用できません（通常モードで動作）', 'error');
+                        setTimeout(clearMessage, 3000);
                     });
             });
+        } else {
+            console.log('Service Worker not supported');
         }
 
         // PWA Install Prompt
